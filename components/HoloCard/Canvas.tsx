@@ -14,7 +14,7 @@ interface Props {
 
 export default function HoloCardCanvas({ themeId }: Props) {
   return (
-    <div className="aspect-[2.5/3.5] w-72 sm:w-80">
+    <div className="aspect-[2.5/3.5] w-72 sm:w-80 touch-none select-none">
       <Canvas
         dpr={[1, 2]}
         camera={{ position: [0, 0, 5], fov: 35 }}
