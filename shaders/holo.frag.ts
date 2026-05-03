@@ -1,25 +1,20 @@
-// Day 4 — first-pass holo fragment shader.
+// Day 4.1 — fragment shader rewrite. The first-pass version was too subtle:
+// it derived all motion from view angle, which barely changed across our
+// flat plane at a small tilt range. The user reported "no detectable
+// responsiveness or shine" — failing the visual gate.
 //
-// The recipe (per V0 plan §4.3, simplified for first-pass):
-//   1. Sample the albedo (the card photo).
-//   2. Compute fresnel from view-direction vs world normal — the card tilts
-//      via group rotation, so fresnel naturally shifts with tilt.
-//   3. Map a parameter t through a 4-color palette ramp; t blends fresnel,
-//      a UV gradient, and time so the iridescence breathes even at rest.
-//   4. Mix iridescent tint into albedo, weighted more strongly at grazing
-//      angles (matches how real holo cards behave).
-//   5. Add a rim highlight at the very edge.
+// This version drives the holo from a `uTilt` uniform pushed from useTilt
+// each frame. Three layered elements are visible even at rest:
+//   1. Diagonal rainbow bands across the surface (palette-ramp driven).
+//   2. High-frequency sparkle stripes (the actual "shine"; bright peaks).
+//   3. A bright hot spot that tracks the pointer (the "wet" reflection).
 //
-// Day 4 limitations, knowingly accepted:
-//   - The shader applies uniformly to the whole front face, including the
-//     PSA red label. A holo mask (so only the card art picks up iridescence)
-//     is day-5+ work.
-//   - No tone mapping — output is straight RGB, with sRGB texture sampling
-//     handled by `texture.colorSpace = SRGBColorSpace` on the JS side.
-//   - mediump precision throughout for mobile-Safari friendliness.
+// All elements are additively composited on top of the albedo so they
+// brighten visibly. The effect strength rises with both fresnel and tilt
+// magnitude so the card "wakes up" when the user interacts.
 
 export default /* glsl */ `
-precision mediump float;
+precision highp float;
 
 uniform float uTime;
 uniform vec3 uPalette[4];
@@ -29,6 +24,7 @@ uniform float uSpeed;
 uniform sampler2D uAlbedo;
 uniform vec3 uRimColor;
 uniform float uRimWidth;
+uniform vec2 uTilt; // [-1, 1] from useTilt; zero at rest
 
 varying vec2 vUv;
 varying vec3 vNormal;
@@ -47,24 +43,41 @@ void main() {
 
   vec3 N = normalize(vNormal);
   vec3 V = normalize(vViewDir);
-  float ndotv = max(0.0, dot(N, V));
-  float fresnel = pow(1.0 - ndotv, 2.0);
+  float ndotv = clamp(dot(N, V), 0.0, 1.0);
+  float fresnel = pow(1.0 - ndotv, 1.2);
 
-  // Iridescence parameter — combines view angle, a UV gradient, and time
-  // so the holo shifts as the user tilts and breathes when the card rests.
-  float t = (1.0 - ndotv) * uFrequency
-          + (vUv.x * 0.6 - vUv.y * 0.4)
-          + uTime * uSpeed * 0.5;
-  vec3 irid = paletteRamp(t);
+  // Diagonal band coordinate. Sweeps across the surface, shifts strongly
+  // with tilt so the rainbow visibly moves under the user's pointer.
+  float band = (vUv.x + vUv.y * 0.8) * uFrequency
+             + uTilt.x * 4.0 - uTilt.y * 4.0
+             + uTime * uSpeed * 0.6;
 
-  // Tint the albedo with the iridescent color. Multiply-by-tint preserves
-  // dark regions (PSA label, card black borders) while colorizing brights.
-  // Bias the tint upward (+0.3) so we lighten rather than only darken.
-  vec3 holoTint = irid * 0.85 + 0.3;
-  vec3 color = mix(albedo, albedo * holoTint, uIntensity * (0.25 + 0.75 * fresnel));
+  // Rainbow color from the theme palette.
+  vec3 irid = paletteRamp(band * 0.15);
 
-  // Rim highlight at very grazing angles.
-  float rim = smoothstep(1.0 - uRimWidth, 1.0, fresnel);
+  // High-frequency sparkle stripes — the actual "shine". Sharp peaks via
+  // pow(...,8) give thin bright bands rather than a smooth color wash.
+  float sparkle = pow(0.5 + 0.5 * sin(band * 3.0), 8.0);
+
+  // Specular hot spot tracking the pointer. Single location on the card
+  // (uTilt is uniform across fragments — unlike vViewDir.xy which varies).
+  vec2 hotCenter = vec2(0.5) - uTilt * 0.4;
+  float hot = smoothstep(0.45, 0.0, length(vUv - hotCenter));
+
+  // Holo overlay — additive layers so the card brightens, not just tints.
+  vec3 colored = irid * (0.4 + sparkle * 1.2);
+  vec3 highlight = vec3(1.0) * (sparkle * 0.7 + hot * 0.5);
+
+  // Strength: base intensity + fresnel boost + tilt-magnitude boost so the
+  // card "wakes up" the more the user interacts.
+  float tiltMag = clamp(length(uTilt), 0.0, 1.0);
+  float strength = uIntensity * (0.5 + 0.4 * fresnel + 0.5 * tiltMag);
+
+  vec3 color = albedo + (colored + highlight) * strength * 0.55;
+
+  // Rim glow. Threshold lowered so it triggers at moderate tilt, not only
+  // grazing angles. Width is theme-controlled.
+  float rim = smoothstep(0.5, 1.0, fresnel);
   color += uRimColor * rim * 0.5;
 
   gl_FragColor = vec4(color, 1.0);

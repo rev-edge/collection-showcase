@@ -77,7 +77,7 @@ function Card({ themeId }: Props) {
     >
       <mesh>
         <planeGeometry args={[FRONT_PLANE_W, PLANE_HEIGHT]} />
-        <HoloMaterial albedo={frontTex} theme={theme} />
+        <HoloMaterial albedo={frontTex} theme={theme} tilt={tilt.current} />
       </mesh>
       <mesh rotation={[0, Math.PI, 0]}>
         <planeGeometry args={[BACK_PLANE_W, PLANE_HEIGHT]} />
