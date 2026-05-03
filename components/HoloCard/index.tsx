@@ -1,18 +1,18 @@
 "use client";
 
 // Public <HoloCard /> entry. Dynamic-imports the actual three.js Canvas with
-// ssr:false so three / r3f / drei never run at SSR time. Day 2 ships a static
-// placeholder plane only — tilt, flip, holo shader land in days 3–5.
-// See plans/v0-implementation-plan.md §3 (component tree) and §4 (theme/shader).
+// ssr:false so three / r3f / drei never run at SSR time. The loading skeleton
+// matches the canvas wrapper aspect (real front-image ratio 688/1160) so the
+// pre-hydration framing is consistent.
 
 import dynamic from "next/dynamic";
 import type { ThemeId } from "@/lib/theme-types";
 
 export interface HoloCardProps {
   themeId: ThemeId;
-  /** Front albedo URL. Optional in Day 2 (placeholder); required by day 3. */
+  /** Front albedo URL. V0 demo uses /demo/card-front.jpg directly. */
   front?: string;
-  /** Back albedo URL. Optional in Day 2 (placeholder); required by day 3. */
+  /** Back albedo URL. V0 demo uses /demo/card-back.jpg directly. */
   back?: string;
 }
 
@@ -21,7 +21,8 @@ const HoloCardCanvas = dynamic(() => import("./Canvas"), {
   loading: () => (
     <div
       aria-hidden
-      className="aspect-[2.5/3.5] w-72 sm:w-80 rounded-2xl bg-white/5"
+      className="w-72 sm:w-80 rounded-2xl bg-white/5"
+      style={{ aspectRatio: "688 / 1160" }}
     />
   ),
 });

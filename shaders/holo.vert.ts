@@ -1,11 +1,19 @@
-// V0 vertex shader — passthrough + varyings (uv, normal, viewDir).
-// Real shader code lands in week 1 day 4. Stored as a TS template string instead of
-// a .glsl file because Next 16 / Turbopack does not expose a zero-config raw-string
-// loader; .ts strings are functionally equivalent at runtime. Use a GLSL-in-JS
-// VS Code extension for syntax highlighting on the /* glsl */ tag.
+// Day 4 — vertex shader for the holo card.
+// Passes UV, world-space normal, and the world-space view direction
+// (fragment → camera) so the fragment shader can compute fresnel as the
+// card tilts. modelMatrix-only for the normal because we never non-uniformly
+// scale (rotation+translation only); inverse-transpose is unnecessary.
 
 export default /* glsl */ `
+varying vec2 vUv;
+varying vec3 vNormal;
+varying vec3 vViewDir;
+
 void main() {
-  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+  vUv = uv;
+  vec4 worldPos = modelMatrix * vec4(position, 1.0);
+  vNormal = normalize(mat3(modelMatrix) * normal);
+  vViewDir = normalize(cameraPosition - worldPos.xyz);
+  gl_Position = projectionMatrix * viewMatrix * worldPos;
 }
 `;
