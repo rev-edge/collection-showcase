@@ -7,7 +7,13 @@
 
 import { useFrame } from "@react-three/fiber";
 import { useMemo, useRef } from "react";
-import { Color, type ShaderMaterial, type Texture, Vector2 } from "three";
+import {
+  Color,
+  type ShaderMaterial,
+  type Texture,
+  Vector2,
+  Vector4,
+} from "three";
 import vertexShader from "@/shaders/holo.vert";
 import fragmentShader from "@/shaders/holo.frag";
 import type { Theme } from "@/lib/theme-types";
@@ -17,15 +23,30 @@ interface Props {
   theme: Theme;
   /** Live tilt vector from useTilt; [-1, 1] each axis, mutated each frame. */
   tilt: { x: number; y: number };
+  /** UV-space rectangle masking where the holo applies: [xMin, yMin, xMax, yMax]. */
+  holoRegion: readonly [number, number, number, number];
 }
 
-export default function HoloMaterial({ albedo, theme, tilt }: Props) {
+export default function HoloMaterial({
+  albedo,
+  theme,
+  tilt,
+  holoRegion,
+}: Props) {
   const materialRef = useRef<ShaderMaterial>(null);
 
   const uniforms = useMemo(
     () => ({
       uTime: { value: 0 },
       uTilt: { value: new Vector2(0, 0) },
+      uHoloRegion: {
+        value: new Vector4(
+          holoRegion[0],
+          holoRegion[1],
+          holoRegion[2],
+          holoRegion[3],
+        ),
+      },
       uPalette: { value: theme.palette.map((hex) => new Color(hex)) },
       uIntensity: { value: theme.holo.intensity },
       uFrequency: { value: theme.holo.frequency },
@@ -34,7 +55,7 @@ export default function HoloMaterial({ albedo, theme, tilt }: Props) {
       uRimColor: { value: new Color(theme.rim.color) },
       uRimWidth: { value: theme.rim.width },
     }),
-    [albedo, theme],
+    [albedo, theme, holoRegion],
   );
 
   useFrame((state) => {

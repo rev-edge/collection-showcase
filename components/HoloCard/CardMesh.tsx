@@ -36,6 +36,20 @@ const BACK_PLANE_W = (PLANE_HEIGHT * BACK_SRC_W) / BACK_SRC_H;
 
 const TILT_AMOUNT = 0.35;
 
+// UV-space rectangle defining where the holo effect should apply on the
+// front face. Real holo cards only have iridescence inside the artwork
+// window — not the PSA label, white frame, yellow card border, or text
+// region. Estimated visually from card-front.jpg (688×1160):
+//   xMin/xMax: card-art window left/right edges (~13%/87% of slab width)
+//   yMin/yMax: card-art window bottom/top in UV (UV y-axis is inverted
+//              vs image y; ~35% to 60% of slab height in UV)
+// This is asset-specific. V1's upload pipeline will derive it per-asset
+// (manual region selection at upload time, with AI-assisted auto-detect
+// as a stretch goal).
+const FRONT_HOLO_REGION: readonly [number, number, number, number] = [
+  0.13, 0.35, 0.87, 0.6,
+];
+
 interface Props {
   themeId: ThemeId;
 }
@@ -77,7 +91,12 @@ function Card({ themeId }: Props) {
     >
       <mesh>
         <planeGeometry args={[FRONT_PLANE_W, PLANE_HEIGHT]} />
-        <HoloMaterial albedo={frontTex} theme={theme} tilt={tilt.current} />
+        <HoloMaterial
+          albedo={frontTex}
+          theme={theme}
+          tilt={tilt.current}
+          holoRegion={FRONT_HOLO_REGION}
+        />
       </mesh>
       <mesh rotation={[0, Math.PI, 0]}>
         <planeGeometry args={[BACK_PLANE_W, PLANE_HEIGHT]} />
