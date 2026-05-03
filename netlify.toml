@@ -1,0 +1,14 @@
+[build]
+  command = "pnpm build"
+  publish = ".next"
+
+[build.environment]
+  NODE_VERSION = "20"
+  # pnpm is auto-detected via pnpm-lock.yaml; no extra config needed.
+  # NPM_FLAGS not set so Netlify uses the project's pnpm version from package manager detection.
+
+# Netlify's Next.js Runtime auto-installs for any Next.js project, but
+# declaring it explicitly here pins the deploy contract and keeps it
+# obvious to future readers / agents.
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
